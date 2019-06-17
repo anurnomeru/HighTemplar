@@ -1,5 +1,6 @@
 package com.anur.ht.common;
 
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,10 +49,11 @@ public class NodeOperator {
                        .orElseThrow(() -> new HighTemplarException("fail to cast str node: " + node + " to Integer"));
     }
 
-    Map<String, List<Integer>> nodeTranslation(List<String> nodes) {
+    Map<String, Optional<String>> nodeTranslation(List<String> nodes) {
         return nodes.stream()
                     .collect(Collectors.groupingBy(s -> s.substring(0, SPECIAL_SIGN_LENGTH - 1),
-                        Collectors.mapping(s -> Integer.valueOf(s.substring(SPECIAL_SIGN_LENGTH - 1)), Collectors.toList())
+                        Collectors.mapping(s -> s.substring(SPECIAL_SIGN_LENGTH - 1),
+                            Collectors.minBy(Comparator.comparing(Integer::valueOf)))
                     ));
     }
 }

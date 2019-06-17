@@ -1,7 +1,10 @@
 package com.anur.ht.common;
 
-import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.locks.LockSupport;
+import java.util.concurrent.locks.ReentrantLock;
+import org.I0Itec.zkclient.IZkDataListener;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.exception.ZkNoNodeException;
 
@@ -36,9 +39,25 @@ public abstract class AbstractZkSynchronizer extends NodeOperator {
         if ((theNodeToWaitSignal = tryAcquire(genNode(specialSign), getChildren())) == null) {
             return;
         }
+
+        Thread thread = Thread.currentThread();
+        final IZkDataListener zkDataListener = new IZkDataListener() {
+
+            @Override
+            public void handleDataChange(String s, Object o) {
+
+            }
+
+            @Override
+            public void handleDataDeleted(String s) {
+                LockSupport.unpark(thread);
+            }
+        };
+
+        zkClient.subscribeDataChanges(theNodeToWaitSignal, zkDataListener);
     }
 
-    abstract protected String tryAcquire(Integer generatedNode, Map<String, List<Integer>> childNodes);
+    abstract protected String tryAcquire(Integer generatedNode, Map<String, Optional<String>> minimumChild);
 
     protected Integer genNode(String specialSign) {
 
@@ -53,7 +72,7 @@ public abstract class AbstractZkSynchronizer extends NodeOperator {
         return node;
     }
 
-    protected Map<String, List<Integer>> getChildren() {
+    protected Map<String, Optional<String>> getChildren() {
         return nodeTranslation(zkClient.getChildren(nodePath));
     }
 
@@ -64,23 +83,22 @@ public abstract class AbstractZkSynchronizer extends NodeOperator {
         }
 
         @Override
-        protected String tryAcquire(Integer generatedNode, Map<String, List<Integer>> childNodes) {
+        protected String tryAcquire(Integer generatedNode, Map<String, Optional<String>> minimumChild) {
             System.out.println(generatedNode);
-            System.out.println(childNodes);
+            System.out.println(minimumChild);
             return null;
         }
     }
 
     public static void main(String[] args) {
-        Mutex mutex = new Mutex("MY-LORD", new ZkClient("127.0.0.1"));
-        mutex.acquire("REA-LK");
-        mutex.acquire("WRI-LK");
-        mutex.acquire("WRI-LK");
-        mutex.acquire("WRI-LK");
-        mutex.acquire("WRI-LK");
-        mutex.acquire("REA-LK");
-        mutex.acquire("REA-LK");
-        mutex.acquire("REA-LK");
-
+//        Mutex mutex = new Mutex("MY-LORD", new ZkClient("127.0.0.1"));
+//        mutex.acquire("REA-LK");
+//        mutex.acquire("WRI-LK");
+//        mutex.acquire("WRI-LK");
+//        mutex.acquire("WRI-LK");
+//        mutex.acquire("WRI-LK");
+//        mutex.acquire("REA-LK");
+//        mutex.acquire("REA-LK");
+//        mutex.acquire("REA-LK");
     }
 }
