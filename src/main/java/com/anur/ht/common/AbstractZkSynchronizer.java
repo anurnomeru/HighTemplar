@@ -1,7 +1,9 @@
 package com.anur.ht.common;
 
 import java.util.List;
+import java.util.Map;
 import org.I0Itec.zkclient.ZkClient;
+import org.I0Itec.zkclient.exception.ZkNoNodeException;
 
 /**
  * Created by Anur IjuoKaruKas on 2019/6/16
@@ -23,6 +25,7 @@ public abstract class AbstractZkSynchronizer extends NodeOperator {
      */
     public AbstractZkSynchronizer(String lockName, ZkClient zkClient) {
         this.nodePath = genNodePath(lockName);
+        this.zkClient = zkClient;
     }
 
     /**
@@ -35,13 +38,49 @@ public abstract class AbstractZkSynchronizer extends NodeOperator {
         }
     }
 
-    abstract protected String tryAcquire(Integer generatedNode, List<Integer> childNode);
+    abstract protected String tryAcquire(Integer generatedNode, Map<String, List<Integer>> childNodes);
 
     protected Integer genNode(String specialSign) {
-        return nodeTranslation(zkClient.createEphemeralSequential(nodePath + genNodeName(specialSign), null));
+
+        Integer node = null;
+        try {
+            node = nodeTranslation(zkClient.createEphemeralSequential(nodePath + genNodeName(specialSign), null), nodePath);
+        } catch (ZkNoNodeException e) {
+            // 首次创建节点由于没有上层节点可能会报错
+            zkClient.createPersistent(nodePath, true);
+            genNode(specialSign);
+        }
+        return node;
     }
 
-    protected List<Integer> getChildren() {
+    protected Map<String, List<Integer>> getChildren() {
         return nodeTranslation(zkClient.getChildren(nodePath));
+    }
+
+    public static class Mutex extends AbstractZkSynchronizer {
+
+        public Mutex(String lockName, ZkClient zkClient) {
+            super(lockName, zkClient);
+        }
+
+        @Override
+        protected String tryAcquire(Integer generatedNode, Map<String, List<Integer>> childNodes) {
+            System.out.println(generatedNode);
+            System.out.println(childNodes);
+            return null;
+        }
+    }
+
+    public static void main(String[] args) {
+        Mutex mutex = new Mutex("MY-LORD", new ZkClient("127.0.0.1"));
+        mutex.acquire("REA-LK");
+        mutex.acquire("WRI-LK");
+        mutex.acquire("WRI-LK");
+        mutex.acquire("WRI-LK");
+        mutex.acquire("WRI-LK");
+        mutex.acquire("REA-LK");
+        mutex.acquire("REA-LK");
+        mutex.acquire("REA-LK");
+
     }
 }

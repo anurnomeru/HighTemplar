@@ -1,6 +1,8 @@
 package com.anur.ht.common;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import com.anur.ht.exception.HighTemplarException;
@@ -17,34 +19,39 @@ public class NodeOperator {
      */
     private final static String NODE_PATH_PREFIX = "/HIGH-TEMPLAR";
 
-    private final static String NODE_PATH_SUFFIX = "/";
+    private final static String NODE_PATH_SEPARATOR = "/";
 
-    private final static String DEFAULT_SPECIAL_SIGN = "DEF-LK";
+    private final static String DEFAULT_LOCK_NAME = "/DEF-LK";
 
-    private final static int SPECIAL_SIGN_LENGTH = 6;
+    private final static String DEFAULT_SPECIAL_SIGN = "/DEF-LK";
 
-    protected String genNodePath(String lockName) {
-        return lockName.endsWith(NODE_PATH_SUFFIX) ? lockName : (lockName + NODE_PATH_SUFFIX);
+    private final static int SPECIAL_SIGN_LENGTH = 7;
+
+    String genNodePath(String lockName) {
+        return NODE_PATH_PREFIX + Optional.ofNullable(lockName)
+                                          .map(s -> s.startsWith(NODE_PATH_SEPARATOR) ? s : NODE_PATH_SEPARATOR + s)
+                                          .orElse(DEFAULT_LOCK_NAME);
     }
 
-    protected String genNodeName(String specialSign) {
+    String genNodeName(String specialSign) {
         return Optional.ofNullable(specialSign)
+                       .map(s -> s.startsWith(NODE_PATH_SEPARATOR) ? s : NODE_PATH_SEPARATOR + s)
                        .filter(s -> s.length() == SPECIAL_SIGN_LENGTH)
                        .orElse(DEFAULT_SPECIAL_SIGN);
     }
 
-    protected Integer nodeTranslation(String node) {
+    Integer nodeTranslation(String node, String nodePath) {
+        int pathLength = nodePath.length() + SPECIAL_SIGN_LENGTH;
         return Optional.of(node)
-                       .map(s -> s.substring(SPECIAL_SIGN_LENGTH))
+                       .map(s -> s.substring(pathLength))
                        .map(Integer::new)
                        .orElseThrow(() -> new HighTemplarException("fail to cast str node: " + node + " to Integer"));
     }
 
-    protected List<Integer> nodeTranslation(List<String> nodes) {
+    Map<String, List<Integer>> nodeTranslation(List<String> nodes) {
         return nodes.stream()
-                    .map(s -> s.substring(SPECIAL_SIGN_LENGTH))
-                    .map(Integer::new)
-                    .sorted()
-                    .collect(Collectors.toList());
+                    .collect(Collectors.groupingBy(s -> s.substring(0, SPECIAL_SIGN_LENGTH - 1),
+                        Collectors.mapping(s -> Integer.valueOf(s.substring(SPECIAL_SIGN_LENGTH - 1)), Collectors.toList())
+                    ));
     }
 }
