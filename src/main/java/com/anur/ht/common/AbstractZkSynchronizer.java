@@ -1,23 +1,12 @@
 package com.anur.ht.common;
 
 import java.util.List;
-import java.util.Optional;
 import org.I0Itec.zkclient.ZkClient;
-import com.sun.org.apache.xerces.internal.dom.ChildNode;
 
 /**
  * Created by Anur IjuoKaruKas on 2019/6/16
  */
-public abstract class AbstractZkSynchronizer {
-
-    /**
-     * Avoid using this path for other purposes when using zookeeper
-     *
-     * 使用 zookeeper 时避免此路径作他用
-     */
-    private static String PREFIX = "/HIGH-TEMPLAR";
-
-    private static String SUFFIX = "/";
+public abstract class AbstractZkSynchronizer extends NodeOperator {
 
     /**
      * we use this path to acquire ephemeral sequential
@@ -33,28 +22,26 @@ public abstract class AbstractZkSynchronizer {
      * 确保不同的锁使用不同的 lockName，同一个锁则依靠同一锁名来进行同步控制
      */
     public AbstractZkSynchronizer(String lockName, ZkClient zkClient) {
-        if (!lockName.endsWith(SUFFIX)) {
-            lockName += SUFFIX;
-        }
-        this.nodePath = PREFIX + lockName;
+        this.nodePath = genNodePath(lockName);
     }
 
+    /**
+     * specialSign 的长度我们规定为 6，这是为了获取 children 时方便截取
+     */
     protected void acquire(String specialSign) {
         String theNodeToWaitSignal;
         if ((theNodeToWaitSignal = tryAcquire(genNode(specialSign), getChildren())) == null) {
             return;
         }
-
-
     }
 
-    abstract protected String tryAcquire(String generatedNode, List<String> childNode);
+    abstract protected String tryAcquire(Integer generatedNode, List<Integer> childNode);
 
-    protected String genNode(String specialSign) {
-        return zkClient.createEphemeralSequential(specialSign == null ? nodePath : nodePath + specialSign, null);
+    protected Integer genNode(String specialSign) {
+        return nodeTranslation(zkClient.createEphemeralSequential(nodePath + genNodeName(specialSign), null));
     }
 
-    protected List<String> getChildren() {
-        return zkClient.getChildren(nodePath);
+    protected List<Integer> getChildren() {
+        return nodeTranslation(zkClient.getChildren(nodePath));
     }
 }
