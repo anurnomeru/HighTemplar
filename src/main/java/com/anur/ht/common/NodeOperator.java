@@ -1,7 +1,6 @@
 package com.anur.ht.common;
 
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,10 +34,10 @@ public class NodeOperator {
     }
 
     String genNodeName(String specialSign) {
-        return Optional.ofNullable(specialSign)
-                       .map(s -> s.startsWith(NODE_PATH_SEPARATOR) ? s : NODE_PATH_SEPARATOR + s)
-                       .filter(s -> s.length() == SPECIAL_SIGN_LENGTH)
-                       .orElse(DEFAULT_SPECIAL_SIGN);
+        return specialSign == null ? DEFAULT_SPECIAL_SIGN : Optional.of(specialSign)
+                                                                    .map(s -> s.startsWith(NODE_PATH_SEPARATOR) ? s : NODE_PATH_SEPARATOR + s)
+                                                                    .filter(s -> s.length() == SPECIAL_SIGN_LENGTH)
+                                                                    .orElseThrow(() -> new HighTemplarException("specialSign's length must be 6"));
     }
 
     Integer nodeTranslation(String node, String nodePath) {
