@@ -1,4 +1,4 @@
-package com.anur.ht.common;
+package com.anur.ht.lock;
 
 import java.util.Comparator;
 import java.util.List;
@@ -27,17 +27,21 @@ public class NodeOperator {
 
     private final static int SPECIAL_SIGN_LENGTH = 7;
 
-    String genNodePath(String lockName) {
-        return NODE_PATH_PREFIX + Optional.ofNullable(lockName)
+    String genNodePath(String nodePath) {
+        return NODE_PATH_PREFIX + Optional.ofNullable(nodePath)
                                           .map(s -> s.startsWith(NODE_PATH_SEPARATOR) ? s : NODE_PATH_SEPARATOR + s)
                                           .orElse(DEFAULT_LOCK_NAME);
     }
 
-    String genNodeName(String specialSign) {
-        return specialSign == null ? DEFAULT_SPECIAL_SIGN : Optional.of(specialSign)
-                                                                    .map(s -> s.startsWith(NODE_PATH_SEPARATOR) ? s : NODE_PATH_SEPARATOR + s)
-                                                                    .filter(s -> s.length() == SPECIAL_SIGN_LENGTH)
-                                                                    .orElseThrow(() -> new HighTemplarException("specialSign's length must be 6"));
+    String genNodeName(String nodeName, boolean lengthCheck) {
+        return nodeName == null
+            ? DEFAULT_SPECIAL_SIGN
+            : Optional.of(nodeName)
+                      .map(s -> s.startsWith(NODE_PATH_SEPARATOR) ? s : NODE_PATH_SEPARATOR + s)
+                      .filter(s -> !lengthCheck || s.length() == SPECIAL_SIGN_LENGTH)
+                      .orElseThrow(() ->
+                          new HighTemplarException("nodeName's length must be " +
+                              SPECIAL_SIGN_LENGTH + " , for example '/DEF-LK', if nodeName not start with '/', high templar will add it to the beginning."));
     }
 
     Integer nodeTranslation(String node, String nodePath) {

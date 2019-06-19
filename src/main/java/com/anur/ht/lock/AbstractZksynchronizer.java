@@ -1,8 +1,6 @@
-package com.anur.ht.common;
+package com.anur.ht.lock;
 
-import java.util.Comparator;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -23,7 +21,7 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
 
     private ZkClient zkClient;
 
-    private ConcurrentHashMap<Thread, NodeInfo> pathKeeper = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Thread, NodeInfo> threadKeeper = new ConcurrentHashMap<>();
 
     /**
      * Please make sure that different lock has uniquely lockName, we
@@ -39,19 +37,19 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
     /**
      * specialSign 的长度我们规定为 6，这是为了获取 children 时方便截取
      */
-    void acquire(String specialSign) {
+    void acquire(String nodeName) {
         Thread currentThread = Thread.currentThread();
         NodeInfo nodeInfo;
 
         // 如果是重入的话，nodeInfo.incr
-        if (pathKeeper.containsKey(currentThread) && (nodeInfo = pathKeeper.get(currentThread)).isSuccessor()) {
+        if (threadKeeper.containsKey(currentThread) && (nodeInfo = threadKeeper.get(currentThread)).isSuccessor()) {
             nodeInfo.incr();
             return;
         }
 
         // 从 zkClient 中生成一个当前节点的 node
-        nodeInfo = genNode(specialSign);
-        pathKeeper.put(currentThread, nodeInfo);
+        nodeInfo = genNodeFromZk(nodeName);
+        threadKeeper.put(currentThread, nodeInfo);
         acquireQueue(nodeInfo.node);
     }
 
@@ -77,7 +75,7 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
                     }
                 };
 
-                String path = nodePath + NODE_PATH_SEPARATOR + theNodeToWaitSignal;
+                String path = nodePath + genNodeName(theNodeToWaitSignal, false);
                 zkClient.subscribeDataChanges(path, zkDataListener);
 
                 if (!zkClient.exists(path)) {
@@ -90,8 +88,8 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
                     e.printStackTrace();
                 }
             } else {
-                pathKeeper.get(Thread.currentThread())
-                          .setSuccessor(true);
+                threadKeeper.get(Thread.currentThread())
+                            .setSuccessor(true);
                 return;
             }
         }
@@ -103,30 +101,30 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
         Thread currentThread = Thread.currentThread();
         NodeInfo nodeInfo;
         // 如果是重入的话，nodeInfo.incr
-        if (pathKeeper.containsKey(currentThread) && (nodeInfo = pathKeeper.get(currentThread)).isSuccessor()) {
+        if (threadKeeper.containsKey(currentThread) && (nodeInfo = threadKeeper.get(currentThread)).isSuccessor()) {
             if (nodeInfo.decr()) {
-                delNode(nodeInfo.originNode);
+                delNodeFromZk(nodeInfo.originNode);
             }
         } else {
             throw new HighTemplarException("Current Thread has not get the lock before");
         }
     }
 
-    private NodeInfo genNode(String specialSign) {
+    private NodeInfo genNodeFromZk(String nodeName) {
         Integer node;
         String nodeOrigin;
         try {
-            nodeOrigin = zkClient.createEphemeralSequential(nodePath + genNodeName(specialSign), null);
+            nodeOrigin = zkClient.createEphemeralSequential(nodePath + genNodeName(nodeName, true), null);
             node = nodeTranslation(nodeOrigin, nodePath);
         } catch (ZkNoNodeException e) {
             // 首次创建节点由于没有上层节点可能会报错
             zkClient.createPersistent(nodePath, true);
-            return genNode(specialSign);
+            return genNodeFromZk(nodeName);
         }
         return new NodeInfo(nodeOrigin, node);
     }
 
-    private void delNode(String nodePath) {
+    private void delNodeFromZk(String nodePath) {
         zkClient.delete(nodePath);
     }
 
@@ -165,57 +163,5 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
             counter--;
             return counter == -1;
         }
-    }
-
-    public static class Mutex extends AbstractZksynchronizer {
-
-        public Mutex(String lockName, ZkClient zkClient) {
-            super(lockName, zkClient);
-        }
-
-        @Override
-        protected String tryAcquire(Integer generatedNode, Map<String, Optional<String>> minimumChild) {
-            Entry<String, Optional<String>> minEntry = minimumChild.entrySet()
-                                                                   .stream()
-                                                                   .min(Comparator.comparing(o -> Integer.valueOf(o.getValue()
-                                                                                                                   .get())))
-                                                                   .orElse(null);
-            return Optional.ofNullable(minEntry)
-                           .map(e -> Integer.valueOf(e.getValue()
-                                                      .get())
-                                            .compareTo(generatedNode) >= 0)
-                           .orElse(true) ? null : minEntry.getKey() + minEntry.getValue()
-                                                                              .get();
-        }
-
-        public void lock() {
-            acquire(null);
-        }
-
-        public void unLock() {
-            release();
-        }
-
-        public void lock(String specialSign) {
-            acquire(specialSign);
-        }
-    }
-
-    public static void main(String[] args) {
-
-        Runnable runnable = () -> {
-            Mutex mutex = new Mutex("Anur-Test", new ZkClient("127.0.0.1"));
-            mutex.lock();
-            System.out.println(Thread.currentThread() + "获取到锁啦！！");
-            try {
-                Thread.sleep(2000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            System.out.println(Thread.currentThread() + "解锁啦！！");
-            mutex.release();
-        };
-        new Thread(runnable).start();
-        new Thread(runnable).start();
     }
 }
