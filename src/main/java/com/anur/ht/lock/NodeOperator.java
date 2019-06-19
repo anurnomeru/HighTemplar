@@ -1,6 +1,6 @@
 package com.anur.ht.lock;
 
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,13 +27,13 @@ public class NodeOperator {
 
     private final static int SPECIAL_SIGN_LENGTH = 7;
 
-    String genNodePath(String nodePath) {
+    static String genNodePath(String nodePath) {
         return NODE_PATH_PREFIX + Optional.ofNullable(nodePath)
                                           .map(s -> s.startsWith(NODE_PATH_SEPARATOR) ? s : NODE_PATH_SEPARATOR + s)
                                           .orElse(DEFAULT_LOCK_NAME);
     }
 
-    String genNodeName(String nodeName, boolean lengthCheck) {
+    static String genNodeName(String nodeName, boolean lengthCheck) {
         return nodeName == null
             ? DEFAULT_SPECIAL_SIGN
             : Optional.of(nodeName)
@@ -44,7 +44,7 @@ public class NodeOperator {
                               SPECIAL_SIGN_LENGTH + " , for example '/DEF-LK', if nodeName not start with '/', high templar will add it to the beginning."));
     }
 
-    Integer nodeTranslation(String node, String nodePath) {
+    static Integer nodeTranslation(String node, String nodePath) {
         int pathLength = nodePath.length() + SPECIAL_SIGN_LENGTH;
         return Optional.of(node)
                        .map(s -> s.substring(pathLength))
@@ -52,10 +52,25 @@ public class NodeOperator {
                        .orElseThrow(() -> new HighTemplarException("fail to cast str node: " + node + " to Integer"));
     }
 
-    Map<String, Optional<String>> nodeTranslation(List<String> nodes) {
+    static Map<String, List<String>> nodeTranslation(List<String> nodes) {
         return nodes.stream()
                     .collect(Collectors.groupingBy(s -> s.substring(0, SPECIAL_SIGN_LENGTH - 1),
-                        Collectors.mapping(s -> s.substring(SPECIAL_SIGN_LENGTH - 1), Collectors.minBy(Comparator.comparing(Integer::valueOf)))
-                    ));
+                        Collectors.mapping(s -> s.substring(SPECIAL_SIGN_LENGTH - 1), Collectors.toList()))
+                    );
+    }
+
+    static String getNodeNextToIfNotMin(Integer generatedNode, List<String> childs) {
+        String nodeNextToChild = null;
+        Integer nodeNextToChildInt = null;
+
+        for (String child : childs) {
+            int thisNode = Integer.valueOf(child);
+            if (generatedNode > thisNode && (nodeNextToChild == null || thisNode < nodeNextToChildInt)) {
+                nodeNextToChild = child;
+                nodeNextToChildInt = thisNode;
+            }
+        }
+
+        return nodeNextToChild;
     }
 }

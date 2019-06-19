@@ -1,9 +1,9 @@
 package com.anur.ht.lock;
 
-import java.util.Comparator;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Optional;
+import java.util.stream.Collectors;
 import org.I0Itec.zkclient.ZkClient;
 
 /**
@@ -16,18 +16,11 @@ public class HtReentrantLock extends AbstractZksynchronizer {
     }
 
     @Override
-    protected String tryAcquire(Integer generatedNode, Map<String, Optional<String>> minimumChild) {
-        Entry<String, Optional<String>> minEntry = minimumChild.entrySet()
-                                                               .stream()
-                                                               .min(Comparator.comparing(o -> Integer.valueOf(o.getValue()
-                                                                                                               .get())))
-                                                               .orElse(null);
-        return Optional.ofNullable(minEntry)
-                       .map(e -> Integer.valueOf(e.getValue()
-                                                  .get())
-                                        .compareTo(generatedNode) >= 0)
-                       .orElse(true) ? null : minEntry.getKey() + minEntry.getValue()
-                                                                          .get();
+    protected String tryAcquire(Integer generatedNode, Map<String, List<String>> childs) {
+        return getNodeNextToIfNotMin(generatedNode, childs.values()
+                                                          .stream()
+                                                          .flatMap(Collection::stream)
+                                                          .collect(Collectors.toList()));
     }
 
     public void lock() {

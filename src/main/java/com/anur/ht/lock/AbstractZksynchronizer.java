@@ -1,7 +1,7 @@
 package com.anur.ht.lock;
 
+import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import org.I0Itec.zkclient.IZkDataListener;
@@ -95,7 +95,7 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
         }
     }
 
-    abstract protected String tryAcquire(Integer generatedNode, Map<String, Optional<String>> minimumChild);
+    abstract protected String tryAcquire(Integer generatedNode, Map<String, List<String>> childs);
 
     void release() {
         Thread currentThread = Thread.currentThread();
@@ -128,7 +128,7 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
         zkClient.delete(nodePath);
     }
 
-    private Map<String, Optional<String>> getChildren() {
+    private Map<String, List<String>> getChildren() {
         return nodeTranslation(zkClient.getChildren(nodePath));
     }
 
