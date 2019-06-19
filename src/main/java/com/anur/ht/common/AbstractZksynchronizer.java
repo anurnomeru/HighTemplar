@@ -77,7 +77,7 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
                     }
                 };
 
-                String path = nodePath + theNodeToWaitSignal;
+                String path = nodePath + NODE_PATH_SEPARATOR + theNodeToWaitSignal;
                 zkClient.subscribeDataChanges(path, zkDataListener);
 
                 if (!zkClient.exists(path)) {
@@ -163,7 +163,7 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
 
         boolean decr() {
             counter--;
-            return counter == 0;
+            return counter == -1;
         }
     }
 
@@ -192,6 +192,10 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
             acquire(null);
         }
 
+        public void unLock() {
+            release();
+        }
+
         public void lock(String specialSign) {
             acquire(specialSign);
         }
@@ -200,10 +204,11 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
     public static void main(String[] args) {
 
         Runnable runnable = () -> {
-            Mutex mutex = new Mutex("萌狮lock", new ZkClient("127.0.0.1"));
+            Mutex mutex = new Mutex("Anur-Test", new ZkClient("127.0.0.1"));
             mutex.lock();
+            System.out.println(Thread.currentThread() + "获取到锁啦！！");
             try {
-                Thread.sleep(10000);
+                Thread.sleep(2000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }

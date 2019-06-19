@@ -19,7 +19,7 @@ public class NodeOperator {
      */
     private final static String NODE_PATH_PREFIX = "/HIGH-TEMPLAR";
 
-    private final static String NODE_PATH_SEPARATOR = "/";
+    protected final static String NODE_PATH_SEPARATOR = "/";
 
     private final static String DEFAULT_LOCK_NAME = "/DEF-LK";
 
@@ -51,8 +51,7 @@ public class NodeOperator {
     Map<String, Optional<String>> nodeTranslation(List<String> nodes) {
         return nodes.stream()
                     .collect(Collectors.groupingBy(s -> s.substring(0, SPECIAL_SIGN_LENGTH - 1),
-                        Collectors.mapping(s -> s.substring(SPECIAL_SIGN_LENGTH - 1),
-                            Collectors.minBy(Comparator.comparing(Integer::valueOf)))
+                        Collectors.mapping(s -> s.substring(SPECIAL_SIGN_LENGTH - 1), Collectors.minBy(Comparator.comparing(Integer::valueOf)))
                     ));
     }
 }
