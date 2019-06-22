@@ -1,6 +1,5 @@
 package com.anur.ht.lock;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -19,13 +18,13 @@ public class NodeOperator {
      */
     private final static String NODE_PATH_PREFIX = "/HIGH-TEMPLAR";
 
-    protected final static String NODE_PATH_SEPARATOR = "/";
+    final static String NODE_PATH_SEPARATOR = "/";
 
-    private final static String DEFAULT_LOCK_NAME = "/DEF-LK";
+    private final static String DEFAULT_LOCK_NAME = "/REEN-LK";
 
-    private final static String DEFAULT_SPECIAL_SIGN = "/DEF-LK";
+    final static String DEFAULT_NODE_NAME = "/DEF-NODE";
 
-    private final static int SPECIAL_SIGN_LENGTH = 7;
+    private final static int SPECIAL_SIGN_LENGTH = 8;
 
     static String genNodePath(String lockName) {
         return NODE_PATH_PREFIX + Optional.ofNullable(lockName)
@@ -34,14 +33,12 @@ public class NodeOperator {
     }
 
     static String genNodeName(String nodeName, boolean lengthCheck) {
-        return nodeName == null
-            ? DEFAULT_SPECIAL_SIGN
-            : Optional.of(nodeName)
-                      .map(s -> s.startsWith(NODE_PATH_SEPARATOR) ? s : NODE_PATH_SEPARATOR + s)
-                      .filter(s -> !lengthCheck || s.length() == SPECIAL_SIGN_LENGTH)
-                      .orElseThrow(() ->
-                          new HighTemplarException("nodeName's length must be " +
-                              SPECIAL_SIGN_LENGTH + " , for example '/DEF-LK', if nodeName not start with '/', high templar will add it to the beginning."));
+        return Optional.of(nodeName)
+                       .map(s -> s.startsWith(NODE_PATH_SEPARATOR) ? s : NODE_PATH_SEPARATOR + s)
+                       .filter(s -> !lengthCheck || s.length() == SPECIAL_SIGN_LENGTH)
+                       .orElseThrow(() ->
+                           new HighTemplarException("nodeName's length must be " +
+                               SPECIAL_SIGN_LENGTH + " , for example '/DEF-LK', if nodeName not start with '/', high templar will add it to the beginning."));
     }
 
     static Integer nodeTranslation(String node, String nodePath) {
@@ -54,10 +51,12 @@ public class NodeOperator {
 
     static Map<String, List<String>> nodeTranslation(List<String> nodes, List<String> excludeNodes) {
         // exclude held node path
-        nodes.removeAll(excludeNodes);
+        if (excludeNodes != null) {
+            nodes.removeAll(excludeNodes);
+        }
 
         return nodes.stream()
-                    .collect(Collectors.groupingBy(s -> s.substring(0, SPECIAL_SIGN_LENGTH - 1),
+                    .collect(Collectors.groupingBy(s -> NODE_PATH_SEPARATOR + s.substring(0, SPECIAL_SIGN_LENGTH - 1),
                         Collectors.mapping(s -> s.substring(SPECIAL_SIGN_LENGTH - 1), Collectors.toList()))
                     );
     }

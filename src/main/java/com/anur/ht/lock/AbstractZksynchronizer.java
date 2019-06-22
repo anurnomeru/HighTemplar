@@ -8,6 +8,8 @@ import java.util.concurrent.CountDownLatch;
 import org.I0Itec.zkclient.IZkDataListener;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.exception.ZkNoNodeException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.anur.ht.common.HtZkClient;
 import com.anur.ht.exception.HighTemplarException;
 
@@ -15,6 +17,10 @@ import com.anur.ht.exception.HighTemplarException;
  * Created by Anur IjuoKaruKas on 2019/6/16
  */
 public abstract class AbstractZksynchronizer extends NodeOperator {
+
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractZksynchronizer.class);
+
+    static final List<String> EMPTY_LIST = new ArrayList<>();
 
     /**
      * we use this path to acquire ephemeral sequential
@@ -50,15 +56,20 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
             if ((nodeInfo = threadKeeper.get(currentThread)
                                         .getByNodeName(nodeName)) != null
                 && nodeInfo.isSuccessor()) {
-                nodeInfo.incr(); // reentrant
+                int count = nodeInfo.incr(); // reentrant
+
+                LOG.info("{}/{} reentrant acquire, now counter is {}", pathPrefix, nodeInfo.pathSuffix, count);
                 return;
             } else {
                 threadKeeper.get(currentThread)
                             .addNodeInfo(nodeInfo = genNodeFromZk(nodeName));
+
+                LOG.warn("{}/{} try to acquire with another nodeName, and it may lead to DEAD-LOCK!", pathPrefix, nodeInfo.pathSuffix);
             }
         } else {
             nodeInfo = genNodeFromZk(nodeName);
             threadKeeper.put(currentThread, nodeInfo);
+            LOG.info("{}/{} try to acquire", pathPrefix, nodeInfo.pathSuffix);
         }
         acquireQueue(nodeInfo.zkClient, nodeInfo);
     }
@@ -73,11 +84,20 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
             && (nodeInfo = threadKeeper.get(currentThread)
                                        .getByNodeName(nodeName)).isSuccessor()) {
 
-            if (nodeInfo.decr()) {
+            int count = nodeInfo.decr();
+            LOG.info("{}/{} try to release, now counter is {}", pathPrefix, nodeInfo.pathSuffix, count);
+
+            if (count == 0) {
+                LOG.info("{}/{} release success.", pathPrefix, nodeInfo.pathSuffix);
+
                 delNodeFromZk(nodeInfo.zkClient, nodeInfo.fullPath);
                 if (threadKeeper.get(currentThread)
                                 .remove(nodeName)) {
                     threadKeeper.remove(currentThread);
+
+                    LOG.info("has been completed release the lock");
+                } else {
+                    LOG.info("but current thread may hold the lock or waiting for the lock");
                 }
             }
         } else {
@@ -111,6 +131,7 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
                 };
 
                 String path = pathPrefix + genNodeName(theNodeToWaitSignal, false);
+                LOG.info("{}/{} is waiting for {} to signal", pathPrefix, nodeInfo.pathSuffix, path);
 
                 zkClient.subscribeDataChanges(path, zkDataListener);
 
@@ -124,6 +145,7 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
                     e.printStackTrace();
                 }
             } else {
+                LOG.info("{}/{} acquire success!", pathPrefix, nodeInfo.pathSuffix);
                 nodeInfo.successor = true;
                 return;
             }
@@ -137,6 +159,7 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
         ZkClient client = htZkClient.gen();
         nodeInfo.nodeName = nodeName;
         nodeInfo.zkClient = client;
+        nodeInfo.counter = 1;
 
         try {
             nodeInfo.fullPath = client.createEphemeralSequential(pathPrefix + nodeName, null);
@@ -180,23 +203,31 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
             return successor;
         }
 
-        void incr() {
-            counter++;
+        int incr() {
+            return ++counter;
         }
 
-        boolean decr() {
-            counter--;
-            return counter == -1;
+        int decr() {
+            return --counter;
         }
 
         /**
          * return if NodeInfo (List) is Empty
          */
         boolean remove(String nodeName) {
-            boolean removeThis = false;
+            if (this.next == null) {
+                return true;
+            } else {
+                removeRecursive(nodeName);
+                return false;
+            }
+        }
 
-            if (this.next != null) {
-                if (removeThis = this.nodeName.equals(nodeName)) {
+        private void removeRecursive(String nodeName) {
+            boolean hasNext = (this.next != null);
+
+            if (hasNext) {
+                if (this.nodeName.equals(nodeName)) {
                     this.nodeName = this.next.nodeName;
                     this.zkClient = this.next.zkClient;
                     this.node = this.next.node;
@@ -204,11 +235,11 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
                     this.counter = this.next.counter;
                     this.next = this.next.next;
                 } else {
-                    remove(this.next.nodeName);
+                    this.next.removeRecursive(nodeName);
                 }
+            } else {
+                throw new HighTemplarException("Current Thread has not get the lock before");
             }
-
-            return removeThis && this.next == null;
         }
 
         void addNodeInfo(NodeInfo nodeInfo) {

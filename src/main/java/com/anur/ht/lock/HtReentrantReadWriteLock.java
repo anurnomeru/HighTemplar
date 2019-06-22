@@ -1,12 +1,9 @@
 package com.anur.ht.lock;
 
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 import com.anur.ht.common.HtZkClient;
 
 /**
@@ -14,9 +11,9 @@ import com.anur.ht.common.HtZkClient;
  */
 public class HtReentrantReadWriteLock {
 
-    private static final String READ_LOCK_NODE_NAME = "/HT-REL";
+    private static final String READ_LOCK_NODE_NAME = "/READ-LK";
 
-    private static final String WRITE_LOCK_NODE_NAME = "/HT-WRL";
+    private static final String WRITE_LOCK_NODE_NAME = "/WRIT-LK";
 
     private ReadLock readLock;
 
@@ -43,10 +40,24 @@ public class HtReentrantReadWriteLock {
 
         @Override
         protected String tryAcquire(Integer generatedNode, Map<String, List<String>> childs) {
-            return getNodeNextToIfNotMin(generatedNode, childs.values()
-                                                              .stream()
-                                                              .flatMap(Collection::stream)
-                                                              .collect(Collectors.toList()));
+
+            Optional<String> minWriteLock = Optional.ofNullable(getNodeNextToIfNotMin(generatedNode, childs.getOrDefault(WRITE_LOCK_NODE_NAME, EMPTY_LIST)));
+            Optional<String> minReadLock = Optional.ofNullable(getNodeNextToIfNotMin(generatedNode, childs.getOrDefault(READ_LOCK_NODE_NAME, EMPTY_LIST)));
+
+            if (minReadLock.isPresent() && minWriteLock.isPresent()) {
+                String mwl = minWriteLock.get();
+                String mrl = minReadLock.get();
+
+                return Integer.valueOf(mwl) > Integer.valueOf(mrl) ?
+                    READ_LOCK_NODE_NAME + mrl :
+                    WRITE_LOCK_NODE_NAME + mwl;
+            } else {
+                String needToWait = minWriteLock.map(s -> WRITE_LOCK_NODE_NAME + s)
+                                                .orElse(null);
+                needToWait = minReadLock.map(s -> READ_LOCK_NODE_NAME + s)
+                                        .orElse(needToWait);
+                return needToWait;
+            }
         }
 
         public void lock() {
@@ -71,9 +82,9 @@ public class HtReentrantReadWriteLock {
 
         @Override
         protected String tryAcquire(Integer generatedNode, Map<String, List<String>> childs) {
-            return getNodeNextToIfNotMin(generatedNode,
-                Optional.ofNullable(childs.get(WRITE_LOCK_NODE_NAME))
-                        .orElse(Collections.EMPTY_LIST));
+            return Optional.ofNullable(getNodeNextToIfNotMin(generatedNode, childs.getOrDefault(WRITE_LOCK_NODE_NAME, EMPTY_LIST)))
+                           .map(s -> WRITE_LOCK_NODE_NAME + s)
+                           .orElse(null);
         }
 
         public void lock() {

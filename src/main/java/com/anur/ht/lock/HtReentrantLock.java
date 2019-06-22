@@ -3,6 +3,7 @@ package com.anur.ht.lock;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import com.anur.ht.common.HtZkClient;
 
@@ -17,17 +18,19 @@ public class HtReentrantLock extends AbstractZksynchronizer {
 
     @Override
     protected String tryAcquire(Integer generatedNode, Map<String, List<String>> childs) {
-        return getNodeNextToIfNotMin(generatedNode, childs.values()
-                                                          .stream()
-                                                          .flatMap(Collection::stream)
-                                                          .collect(Collectors.toList()));
+        return Optional.ofNullable(getNodeNextToIfNotMin(generatedNode, childs.values()
+                                                                              .stream()
+                                                                              .flatMap(Collection::stream)
+                                                                              .collect(Collectors.toList())))
+                       .map(s -> DEFAULT_NODE_NAME + s)
+                       .orElse(null);
     }
 
     public void lock() {
-        acquire(null);
+        acquire(DEFAULT_NODE_NAME);
     }
 
     public void unLock() {
-        release(null);
+        release(DEFAULT_NODE_NAME);
     }
 }

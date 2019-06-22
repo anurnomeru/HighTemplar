@@ -25,7 +25,6 @@ public class AppTest {
             htReentrantLock.lock();
             htReentrantLock.lock();
 
-            System.out.println("----------get lock----------");
             try {
                 Thread.sleep(5000);
             } catch (InterruptedException e) {
@@ -33,14 +32,12 @@ public class AppTest {
             }
 
             htReentrantLock.unLock();
-            System.out.println("----------un lock once----------");
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
             htReentrantLock.unLock();
-            System.out.println("----------un lock twice----------");
             cdl.countDown();
         };
 
@@ -51,65 +48,102 @@ public class AppTest {
     }
 
     @Test
-    public void ReetrantReadWriteLockTest() throws InterruptedException {
+    public void ReentrantReadWriteLockTest() throws InterruptedException {
 
-        CountDownLatch cdl = new CountDownLatch(2);
-        HtReentrantReadWriteLock wrl = new HtReentrantReadWriteLock("Anur-test", new HtZkClient("127.0.0.1"));
+        CountDownLatch cdl = new CountDownLatch(6);
+        HtReentrantReadWriteLock wrl = new HtReentrantReadWriteLock("-Anur-WR-", new HtZkClient("127.0.0.1"));
         ReadLock readLock = wrl.readLock();
         WriteLock writeLock = wrl.writeLock();
 
-        Runnable runnable = () -> {
+        new Thread(() -> {
+            readLock.lock();
+
             try {
-                System.out.println("----------try get r-lock----------");
-                readLock.lock();
-                System.out.println("----------try get r-lock success----------");
-
-                System.out.println("----------try get w-lock----------");
-                writeLock.lock();
-                System.out.println("----------try get w-lock success----------");
-
-                System.out.println("----------try get r-lock----------");
-                readLock.lock();
-                System.out.println("----------try get r-lock success----------");
-
-                System.out.println("----------try get r-lock----------");
-                readLock.lock();
-                System.out.println("----------try get r-lock success----------");
-
-                System.out.println("----------try get w-lock----------");
-                writeLock.lock();
-                System.out.println("----------try get w-lock success----------");
-
-                Thread.sleep(2000);
-
-                readLock.unLock();
-                System.out.println("----------un lock readLock 1----------");
-                Thread.sleep(1000);
-
-                writeLock.unLock();
-                System.out.println("----------un lock writeLock 1----------");
-                Thread.sleep(1000);
-
-                readLock.unLock();
-                System.out.println("----------un lock readLock 2----------");
-                Thread.sleep(1000);
-
-                readLock.unLock();
-                System.out.println("----------un lock readLock 3----------");
-                Thread.sleep(1000);
-
-                writeLock.unLock();
-                System.out.println("----------un lock writeLock 2----------");
-                Thread.sleep(1000);
-
-                cdl.countDown();
+                System.out.println("1 - 获取到了读锁");
+                Thread.sleep(5000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-        };
 
-        new Thread(runnable).start();
-//        new Thread(runnable).start();
+            readLock.unLock();
+            cdl.countDown();
+        }).start();
+        Thread.sleep(1000);
+
+        new Thread(() -> {
+            writeLock.lock();
+
+            try {
+                System.out.println("2 - 获取到了写锁");
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            writeLock.unLock();
+            cdl.countDown();
+        }).start();
+        Thread.sleep(1000);
+
+        new Thread(() -> {
+            writeLock.lock();
+
+            try {
+                System.out.println("3 - 获取到了写锁");
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            writeLock.unLock();
+            cdl.countDown();
+        }).start();
+        Thread.sleep(1000);
+
+        new Thread(() -> {
+            readLock.lock();
+
+            try {
+                System.out.println("4 - 获取到了读锁");
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            readLock.unLock();
+            cdl.countDown();
+        }).start();
+        Thread.sleep(1000);
+
+        new Thread(() -> {
+            readLock.lock();
+
+            try {
+                System.out.println("4 - 获取到了读锁");
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            readLock.unLock();
+            cdl.countDown();
+        }).start();
+        Thread.sleep(1000);
+
+        new Thread(() -> {
+            readLock.lock();
+
+            try {
+                System.out.println("4 - 获取到了读锁");
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            readLock.unLock();
+            cdl.countDown();
+        }).start();
+        Thread.sleep(1000);
 
         cdl.await();
     }
