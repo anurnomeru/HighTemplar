@@ -11,7 +11,6 @@ import com.anur.ht.common.HtZkClient;
  */
 public class HtReentrantLock extends AbstractZksynchronizer {
 
-
     public HtReentrantLock(String lockName, HtZkClient htZkClient) {
         super(lockName, htZkClient);
     }
@@ -29,6 +28,6 @@ public class HtReentrantLock extends AbstractZksynchronizer {
     }
 
     public void unLock() {
-        release();
+        release(null);
     }
 }

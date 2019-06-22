@@ -27,8 +27,8 @@ public class NodeOperator {
 
     private final static int SPECIAL_SIGN_LENGTH = 7;
 
-    static String genNodePath(String nodePath) {
-        return NODE_PATH_PREFIX + Optional.ofNullable(nodePath)
+    static String genNodePath(String lockName) {
+        return NODE_PATH_PREFIX + Optional.ofNullable(lockName)
                                           .map(s -> s.startsWith(NODE_PATH_SEPARATOR) ? s : NODE_PATH_SEPARATOR + s)
                                           .orElse(DEFAULT_LOCK_NAME);
     }
@@ -52,7 +52,10 @@ public class NodeOperator {
                        .orElseThrow(() -> new HighTemplarException("fail to cast str node: " + node + " to Integer"));
     }
 
-    static Map<String, List<String>> nodeTranslation(List<String> nodes) {
+    static Map<String, List<String>> nodeTranslation(List<String> nodes, List<String> excludeNodes) {
+        // exclude held node path
+        nodes.removeAll(excludeNodes);
+
         return nodes.stream()
                     .collect(Collectors.groupingBy(s -> s.substring(0, SPECIAL_SIGN_LENGTH - 1),
                         Collectors.mapping(s -> s.substring(SPECIAL_SIGN_LENGTH - 1), Collectors.toList()))
