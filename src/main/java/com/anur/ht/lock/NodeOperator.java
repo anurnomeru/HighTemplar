@@ -70,7 +70,6 @@ public class NodeOperator {
                 nodeNextToChildInt = thisNode;
             }
         }
-
         return nodeNextToChild;
     }
 }

@@ -7,6 +7,7 @@ import java.util.concurrent.CountDownLatch;
 import org.I0Itec.zkclient.IZkDataListener;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.exception.ZkNoNodeException;
+import com.anur.ht.common.HtZkClient;
 import com.anur.ht.exception.HighTemplarException;
 
 /**
@@ -19,7 +20,7 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
      */
     private String nodePath;
 
-    private ZkClient zkClient;
+    private HtZkClient htZkClient;
 
     private ConcurrentHashMap<Thread, NodeInfo> threadKeeper = new ConcurrentHashMap<>();
 
@@ -29,9 +30,9 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
      *
      * 确保不同的锁使用不同的 lockName，同一个锁则依靠同一锁名来进行同步控制
      */
-    public AbstractZksynchronizer(String lockName, ZkClient zkClient) {
+    public AbstractZksynchronizer(String lockName, HtZkClient htZkClient) {
         this.nodePath = genNodePath(lockName);
-        this.zkClient = zkClient;
+        this.htZkClient = htZkClient;
     }
 
     /**
@@ -42,7 +43,9 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
         NodeInfo nodeInfo;
 
         // 如果是重入的话，nodeInfo.incr
-        if (threadKeeper.containsKey(currentThread) && (nodeInfo = threadKeeper.get(currentThread)).isSuccessor()) {
+        if (threadKeeper.containsKey(currentThread)
+            && (nodeInfo = threadKeeper.get(currentThread)).isSuccessor()
+            && nodeInfo.counter > -1) {
             nodeInfo.incr();
             return;
         }
@@ -54,6 +57,10 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
     }
 
     private void acquireQueue(int node) {
+        Thread currentThread = Thread.currentThread();
+        NodeInfo nodeInfo = threadKeeper.get(currentThread);
+        ZkClient client = nodeInfo.zkClient;
+
         for (; ; ) {
             String theNodeToWaitSignal;
 
@@ -76,9 +83,10 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
                 };
 
                 String path = nodePath + genNodeName(theNodeToWaitSignal, false);
-                zkClient.subscribeDataChanges(path, zkDataListener);
 
-                if (!zkClient.exists(path)) {
+                client.subscribeDataChanges(path, zkDataListener);
+
+                if (!client.exists(path)) {
                     cdl.countDown();
                 }
 
@@ -88,8 +96,7 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
                     e.printStackTrace();
                 }
             } else {
-                threadKeeper.get(Thread.currentThread())
-                            .setSuccessor(true);
+                nodeInfo.successor = true;
                 return;
             }
         }
@@ -111,28 +118,36 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
     }
 
     private NodeInfo genNodeFromZk(String nodeName) {
-        Integer node;
-        String nodeOrigin;
+        NodeInfo nodeInfo = new NodeInfo();
+        ZkClient client = htZkClient.gen();
+        nodeInfo.nodeName = nodeName;
+        nodeInfo.zkClient = client;
+
         try {
-            nodeOrigin = zkClient.createEphemeralSequential(nodePath + genNodeName(nodeName, true), null);
-            node = nodeTranslation(nodeOrigin, nodePath);
+            nodeInfo.originNode = client.createEphemeralSequential(nodePath + genNodeName(nodeName, true), null);
+            nodeInfo.node = nodeTranslation(nodeInfo.originNode, nodePath);
         } catch (ZkNoNodeException e) {
             // 首次创建节点由于没有上层节点可能会报错
-            zkClient.createPersistent(nodePath, true);
+            client.createPersistent(nodePath, true);
             return genNodeFromZk(nodeName);
         }
-        return new NodeInfo(nodeOrigin, node);
+
+        return nodeInfo;
     }
 
     private void delNodeFromZk(String nodePath) {
-        zkClient.delete(nodePath);
+        threadKeeper.get(Thread.currentThread()).zkClient.delete(nodePath);
     }
 
     private Map<String, List<String>> getChildren() {
-        return nodeTranslation(zkClient.getChildren(nodePath));
+        return nodeTranslation(threadKeeper.get(Thread.currentThread()).zkClient.getChildren(nodePath));
     }
 
     public static class NodeInfo {
+
+        String nodeName;
+
+        ZkClient zkClient;
 
         String originNode;
 
@@ -142,17 +157,8 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
 
         int counter;
 
-        NodeInfo(String originNode, int node) {
-            this.originNode = originNode;
-            this.node = node;
-        }
-
         boolean isSuccessor() {
             return successor;
-        }
-
-        void setSuccessor(boolean successor) {
-            this.successor = successor;
         }
 
         void incr() {

@@ -1,10 +1,10 @@
 package com.anur;
 
 import java.util.concurrent.CountDownLatch;
+import com.anur.ht.common.HtZkClient;
 import com.anur.ht.lock.HtReentrantLock;
 import static org.junit.Assert.assertTrue;
 
-import org.I0Itec.zkclient.ZkClient;
 import org.junit.Test;
 
 /**
@@ -16,8 +16,9 @@ public class AppTest {
     public void ReentrantLockTest() throws InterruptedException {
 
         CountDownLatch cdl = new CountDownLatch(2);
+        HtReentrantLock htReentrantLock = new HtReentrantLock("Anur", new HtZkClient("127.0.0.1"));
+
         Runnable runnable = () -> {
-            HtReentrantLock htReentrantLock = new HtReentrantLock("Anur", new ZkClient("127.0.0.1"));
             htReentrantLock.lock();
             htReentrantLock.lock();
 

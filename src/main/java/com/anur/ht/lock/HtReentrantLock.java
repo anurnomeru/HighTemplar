@@ -4,15 +4,16 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.I0Itec.zkclient.ZkClient;
+import com.anur.ht.common.HtZkClient;
 
 /**
  * Created by Anur IjuoKaruKas on 2019/6/19
  */
 public class HtReentrantLock extends AbstractZksynchronizer {
 
-    public HtReentrantLock(String lockName, ZkClient zkClient) {
-        super(lockName, zkClient);
+
+    public HtReentrantLock(String lockName, HtZkClient htZkClient) {
+        super(lockName, htZkClient);
     }
 
     @Override
