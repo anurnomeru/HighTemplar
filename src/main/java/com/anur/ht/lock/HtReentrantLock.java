@@ -10,7 +10,7 @@ import com.anur.ht.common.HtZkClient;
 /**
  * Created by Anur IjuoKaruKas on 2019/6/19
  */
-public class HtReentrantLock extends AbstractZksynchronizer {
+public class HtReentrantLock extends AbstractZkSynchronizer {
 
     public HtReentrantLock(String lockName, HtZkClient htZkClient) {
         super(lockName, htZkClient);

@@ -16,9 +16,9 @@ import com.anur.ht.exception.HighTemplarException;
 /**
  * Created by Anur IjuoKaruKas on 2019/6/16
  */
-public abstract class AbstractZksynchronizer extends NodeOperator {
+public abstract class AbstractZkSynchronizer extends NodeOperator {
 
-    private static final Logger LOG = LoggerFactory.getLogger(AbstractZksynchronizer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractZkSynchronizer.class);
 
     static final List<String> EMPTY_LIST = new ArrayList<>();
 
@@ -27,8 +27,14 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
      */
     String pathPrefix;
 
+    /**
+     * htZkClient is a zkClient generator
+     */
     HtZkClient htZkClient;
 
+    /**
+     * threadKeeper hold the NodeInfo which store the lock info during the AZS
+     */
     ConcurrentHashMap<Thread, NodeInfo> threadKeeper;
 
     /**
@@ -37,14 +43,17 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
      *
      * 确保不同的锁使用不同的 lockName，同一个锁则依靠同一锁名来进行同步控制
      */
-    public AbstractZksynchronizer(String lockName, HtZkClient htZkClient) {
+    public AbstractZkSynchronizer(String lockName, HtZkClient htZkClient) {
         this.pathPrefix = genNodePath(lockName);
         this.htZkClient = htZkClient;
         this.threadKeeper = new ConcurrentHashMap<>();
     }
 
     /**
-     * specialSign 的长度我们规定为 6，这是为了获取 children 时方便截取，默认传入 null 即可
+     * nodeName 的长度我们规定为 8（包含开头的 '/'），这是为了获取 children 时方便截取，默认传入 {@link #DEFAULT_NODE_NAME} 即可
+     *
+     * we rule that 'nodeName's length must be 8 (contain the first char '/') which helping
+     * {@link #nodeTranslation(String, String)} to specify `nodeName` and `ephemeral sequential`.
      */
     void acquire(String nodeName) {
         nodeName = genNodeName(nodeName, true);
@@ -74,6 +83,12 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
         acquireQueue(nodeInfo.zkClient, nodeInfo);
     }
 
+    /**
+     * The release semantics are the same as AQS, how many times we acquire then
+     * we should release same times or else the lock will not fully release.
+     *
+     * 释放语义与 AQS 相同， acquire 多少次，相对的也要 release 多少次。
+     */
     void release(String nodeName) {
         nodeName = genNodeName(nodeName, true);
 
@@ -105,6 +120,15 @@ public abstract class AbstractZksynchronizer extends NodeOperator {
         }
     }
 
+    /**
+     * get all the child that under the node's path to judge if current thread need park,
+     * we should override the {@link #tryAcquire(Integer, Map)} method, return 'null'
+     * mean current thread obtain the lock, or return the child name should waiting for.
+     *
+     * 这里面其实是一个阻塞获取路径下所有其他节点，并以此节点来判断是否需要阻塞的方法。
+     * 子类需要重写 {@link #tryAcquire(Integer, Map)}， 返回空代表无需阻塞，
+     * 否则返回需要等待通知的节点的名字。
+     */
     private void acquireQueue(ZkClient zkClient, NodeInfo nodeInfo) {
         for (; ; ) {
             String theNodeToWaitSignal;

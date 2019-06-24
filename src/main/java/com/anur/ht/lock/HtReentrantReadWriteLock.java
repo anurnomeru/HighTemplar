@@ -32,7 +32,7 @@ public class HtReentrantReadWriteLock {
         return writeLock;
     }
 
-    public static class WriteLock extends AbstractZksynchronizer {
+    public static class WriteLock extends AbstractZkSynchronizer {
 
         private WriteLock(String lockName, HtZkClient htZkClient) {
             super(lockName, htZkClient);
@@ -69,7 +69,7 @@ public class HtReentrantReadWriteLock {
         }
     }
 
-    public static class ReadLock extends AbstractZksynchronizer {
+    public static class ReadLock extends AbstractZkSynchronizer {
 
         private ReadLock(String lockName, HtZkClient htZkClient) {
             super(lockName, htZkClient);
